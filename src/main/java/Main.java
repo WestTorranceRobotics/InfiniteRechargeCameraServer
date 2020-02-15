@@ -18,11 +18,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import edu.wpi.cscore.HttpCamera;
 import edu.wpi.cscore.MjpegServer;
 import edu.wpi.cscore.UsbCamera;
 import edu.wpi.cscore.VideoSource;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.networktables.EntryListenerFlags;
+import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
 /*
@@ -90,6 +92,9 @@ public final class Main {
   public static List<CameraConfig> cameraConfigs = new ArrayList<>();
   public static List<SwitchedCameraConfig> switchedCameraConfigs = new ArrayList<>();
   public static List<VideoSource> cameras = new ArrayList<>();
+
+  private static volatile boolean limelightSelected;
+  private static volatile boolean trackingRequested;
 
   private Main() {
   }
@@ -245,6 +250,15 @@ public final class Main {
     return camera;
   }
 
+  public static VideoSource startLimelight() {
+    System.out.println("Starting camera 'limelight' on http://limelight.local:5800");
+    CameraServer inst = CameraServer.getInstance();
+    HttpCamera camera = new HttpCamera("limelight", "http://limelight.local:5800");
+    MjpegServer server = inst.startAutomaticCapture(camera);
+    server.setConfigJson(camera.getConfigJson());
+    return camera;
+  }
+
   /**
    * Start running the switched camera.
    */
@@ -275,6 +289,52 @@ public final class Main {
     return server;
   }
 
+  public static MjpegServer startSwitchedLimelight(String key) {
+    System.out.println("Starting switched camera 'limelight' on " + key);
+    MjpegServer server = CameraServer.getInstance().addSwitchedCamera("limelight");
+
+    NetworkTableInstance.getDefault().getTable("limelight").getEntry("trackNow").addListener(event -> {
+      trackingRequested = event.value.getBoolean();
+      updatePipeline();
+    }, EntryListenerFlags.kImmediate | EntryListenerFlags.kNew | EntryListenerFlags.kUpdate);
+
+    if (key != null) {
+      NetworkTableInstance.getDefault().getEntry(key).addListener(event -> {
+        if (event.value.isDouble()) {
+          int i = (int) event.value.getDouble();
+          if (i >= 0 && i < cameras.size()) {
+            server.setSource(cameras.get(i));
+          }
+          limelightSelected = i == cameras.size() - 1;
+        } else if (event.value.isString()) {
+          String str = event.value.getString();
+          for (int i = 0; i < cameraConfigs.size(); i++) {
+            if (str.equals(cameraConfigs.get(i).name)) {
+              server.setSource(cameras.get(i));
+              break;
+            }
+          }
+          limelightSelected = str.equals("limelight");
+        }
+        updatePipeline();
+      },
+      EntryListenerFlags.kImmediate | EntryListenerFlags.kNew | EntryListenerFlags.kUpdate);
+    }
+    return server;
+  }
+
+  private static void updatePipeline() {
+    NetworkTableEntry pipeline = NetworkTableInstance.getDefault().getTable("limelight").getEntry("pipeline");
+    NetworkTableEntry ledmode = NetworkTableInstance.getDefault().getTable("limelight").getEntry("ledMode");
+    if (!trackingRequested && limelightSelected) {
+      pipeline.setDouble(1); // just look
+      ledmode.setDouble(1); // off
+    } else {
+      pipeline.setDouble(0); // track
+      ledmode.setDouble(2); // blink
+    }
+  }
+
   /**
    * Main.
    */
@@ -302,10 +362,21 @@ public final class Main {
     for (CameraConfig config : cameraConfigs) {
       cameras.add(startCamera(config));
     }
+    cameras.add(startLimelight());
 
     // start switched cameras
+    String key = null;
     for (SwitchedCameraConfig config : switchedCameraConfigs) {
+      key = key == null ? config.key : config.key == key ? key : "null";
       startSwitchedCamera(config);
+    }
+    if (key == null) {
+      System.out.println("No cameras plugged in.");
+    }
+    if ("null".equals(key)) {
+      System.out.println("Key is not the same for each camera.");
+    } else {
+      startSwitchedLimelight(key);
     }
 
     // loop forever
