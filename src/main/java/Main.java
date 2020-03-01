@@ -12,6 +12,7 @@ import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /*----------------------------------------------------------------------------*/
 /* Copyright (c) 2018 FIRST. All Rights Reserved.                             */
@@ -33,6 +34,15 @@ public final class Main {
    */
   public static void main(String... args) {
 
+    System.out.println("Starting network tables");
+    NetworkTableInstance.getDefault().startClientTeam(5124);
+
+    try {
+      Thread.sleep(5000);
+    } catch (InterruptedException ex) {
+      System.out.println("Program not allowed to wait: network tables may not be started.");
+    }
+
     CameraServer server = CameraServer.getInstance();
     
     VideoCamera[] cameras = new VideoCamera[NUMBER_CAMERAS + 1];
@@ -51,7 +61,9 @@ public final class Main {
 
     NetworkTable table = NetworkTableInstance.getDefault().getTable("rpi");
     NetworkTableEntry aimbot = table.getEntry("aimbot");
+    aimbot.setDouble(0);
     NetworkTableEntry camera = table.getEntry("camera");
+    camera.setDouble(0);
 
     NetworkTableEntry pipeline = NetworkTableInstance.getDefault()
       .getTable("limelight").getEntry("pipeline");
@@ -67,11 +79,14 @@ public final class Main {
       }
     }, generateAllFlagsMask());
 
-    Shuffleboard.getTab("Driving Display").add("Selected Camera View", output)
+    System.out.println("Adding view to Shuffleboard");
+    Shuffleboard.getTab("Driving Display").add("Selected Camera View", output.getSource())
     .withSize(8, 4).withPosition(1, 0).withWidget(BuiltInWidgets.kCameraStream);
 
+    int i = 0;
     while (true) {
       try {
+        SmartDashboard.putNumber("Heartbeat", ++i);
         Thread.sleep(1000);
       } catch (InterruptedException ex) {
         return;
