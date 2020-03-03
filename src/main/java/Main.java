@@ -50,7 +50,7 @@ public final class Main {
       cameras[i] = server.startAutomaticCapture(cameraPorts[i]);
       cameras[i].setConnectionStrategy(ConnectionStrategy.kAutoManage);
       cameras[i].setFPS(30);
-      cameras[i].setResolution(720, 480);
+      cameras[i].setResolution(320, 240);
       server.addCamera(cameras[i]);
     }
     cameras[NUMBER_CAMERAS] = new HttpCamera("limelight", "http://limelight.local:5800");
@@ -58,8 +58,8 @@ public final class Main {
     
     MjpegServer output = (MjpegServer) server.getServer();
     output.setSource(cameras[0]);
-    output.setResolution(720, 480);
-    output.setCompression(0);
+    output.setResolution(320, 240);
+    output.setCompression(50);
     output.setDefaultCompression(50);
     output.setFPS(30);
 
