@@ -1,3 +1,19 @@
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+import edu.wpi.cscore.HttpCamera;
+import edu.wpi.cscore.MjpegServer;
+import edu.wpi.cscore.VideoCamera;
+import edu.wpi.cscore.VideoSource.ConnectionStrategy;
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.networktables.EntryListenerFlags;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 /*----------------------------------------------------------------------------*/
 /* Copyright (c) 2018 FIRST. All Rights Reserved.                             */
 /* Open Source Software - may be modified and shared by FRC teams. The code   */
@@ -5,316 +21,114 @@
 /* the project.                                                               */
 /*----------------------------------------------------------------------------*/
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import edu.wpi.cscore.MjpegServer;
-import edu.wpi.cscore.UsbCamera;
-import edu.wpi.cscore.VideoSource;
-import edu.wpi.first.cameraserver.CameraServer;
-import edu.wpi.first.networktables.EntryListenerFlags;
-import edu.wpi.first.networktables.NetworkTableInstance;
-
-/*
-   JSON format:
-   {
-       "team": <team number>,
-       "ntmode": <"client" or "server", "client" if unspecified>
-       "cameras": [
-           {
-               "name": <camera name>
-               "path": <path, e.g. "/dev/video0">
-               "pixel format": <"MJPEG", "YUYV", etc>   // optional
-               "width": <video mode width>              // optional
-               "height": <video mode height>            // optional
-               "fps": <video mode fps>                  // optional
-               "brightness": <percentage brightness>    // optional
-               "white balance": <"auto", "hold", value> // optional
-               "exposure": <"auto", "hold", value>      // optional
-               "properties": [                          // optional
-                   {
-                       "name": <property name>
-                       "value": <property value>
-                   }
-               ],
-               "stream": {                              // optional
-                   "properties": [
-                       {
-                           "name": <stream property name>
-                           "value": <stream property value>
-                       }
-                   ]
-               }
-           }
-       ]
-       "switched cameras": [
-           {
-               "name": <virtual camera name>
-               "key": <network table key used for selection>
-               // if NT value is a string, it's treated as a name
-               // if NT value is a double, it's treated as an integer index
-           }
-       ]
-   }
- */
-
 public final class Main {
-  private static String configFile = "/boot/frc.json";
 
-  @SuppressWarnings("MemberName")
-  public static class CameraConfig {
-    public String name;
-    public String path;
-    public JsonObject config;
-    public JsonElement streamConfig;
-  }
-
-  @SuppressWarnings("MemberName")
-  public static class SwitchedCameraConfig {
-    public String name;
-    public String key;
-  };
-
-  public static int team;
-  public static boolean server;
-  public static List<CameraConfig> cameraConfigs = new ArrayList<>();
-  public static List<SwitchedCameraConfig> switchedCameraConfigs = new ArrayList<>();
-  public static List<VideoSource> cameras = new ArrayList<>();
+  private static final int[] cameraPorts = {0, 2, 4};
+  public static final int NUMBER_CAMERAS = cameraPorts.length;
 
   private Main() {
-  }
-
-  /**
-   * Report parse error.
-   */
-  public static void parseError(String str) {
-    System.err.println("config error in '" + configFile + "': " + str);
-  }
-
-  /**
-   * Read single camera configuration.
-   */
-  public static boolean readCameraConfig(JsonObject config) {
-    CameraConfig cam = new CameraConfig();
-
-    // name
-    JsonElement nameElement = config.get("name");
-    if (nameElement == null) {
-      parseError("could not read camera name");
-      return false;
-    }
-    cam.name = nameElement.getAsString();
-
-    // path
-    JsonElement pathElement = config.get("path");
-    if (pathElement == null) {
-      parseError("camera '" + cam.name + "': could not read path");
-      return false;
-    }
-    cam.path = pathElement.getAsString();
-
-    // stream properties
-    cam.streamConfig = config.get("stream");
-
-    cam.config = config;
-
-    cameraConfigs.add(cam);
-    return true;
-  }
-
-  /**
-   * Read single switched camera configuration.
-   */
-  public static boolean readSwitchedCameraConfig(JsonObject config) {
-    SwitchedCameraConfig cam = new SwitchedCameraConfig();
-
-    // name
-    JsonElement nameElement = config.get("name");
-    if (nameElement == null) {
-      parseError("could not read switched camera name");
-      return false;
-    }
-    cam.name = nameElement.getAsString();
-
-    // path
-    JsonElement keyElement = config.get("key");
-    if (keyElement == null) {
-      parseError("switched camera '" + cam.name + "': could not read key");
-      return false;
-    }
-    cam.key = keyElement.getAsString();
-
-    switchedCameraConfigs.add(cam);
-    return true;
-  }
-
-  /**
-   * Read configuration file.
-   */
-  @SuppressWarnings("PMD.CyclomaticComplexity")
-  public static boolean readConfig() {
-    // parse file
-    JsonElement top;
-    try {
-      top = new JsonParser().parse(Files.newBufferedReader(Paths.get(configFile)));
-    } catch (IOException ex) {
-      System.err.println("could not open '" + configFile + "': " + ex);
-      return false;
-    }
-
-    // top level must be an object
-    if (!top.isJsonObject()) {
-      parseError("must be JSON object");
-      return false;
-    }
-    JsonObject obj = top.getAsJsonObject();
-
-    // team number
-    JsonElement teamElement = obj.get("team");
-    if (teamElement == null) {
-      parseError("could not read team number");
-      return false;
-    }
-    team = teamElement.getAsInt();
-
-    // ntmode (optional)
-    if (obj.has("ntmode")) {
-      String str = obj.get("ntmode").getAsString();
-      if ("client".equalsIgnoreCase(str)) {
-        server = false;
-      } else if ("server".equalsIgnoreCase(str)) {
-        server = true;
-      } else {
-        parseError("could not understand ntmode value '" + str + "'");
-      }
-    }
-
-    // cameras
-    JsonElement camerasElement = obj.get("cameras");
-    if (camerasElement == null) {
-      parseError("could not read cameras");
-      return false;
-    }
-    JsonArray cameras = camerasElement.getAsJsonArray();
-    for (JsonElement camera : cameras) {
-      if (!readCameraConfig(camera.getAsJsonObject())) {
-        return false;
-      }
-    }
-
-    if (obj.has("switched cameras")) {
-      JsonArray switchedCameras = obj.get("switched cameras").getAsJsonArray();
-      for (JsonElement camera : switchedCameras) {
-        if (!readSwitchedCameraConfig(camera.getAsJsonObject())) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Start running the camera.
-   */
-  public static VideoSource startCamera(CameraConfig config) {
-    System.out.println("Starting camera '" + config.name + "' on " + config.path);
-    CameraServer inst = CameraServer.getInstance();
-    UsbCamera camera = new UsbCamera(config.name, config.path);
-    MjpegServer server = inst.startAutomaticCapture(camera);
-
-    Gson gson = new GsonBuilder().create();
-
-    camera.setConfigJson(gson.toJson(config.config));
-    camera.setConnectionStrategy(VideoSource.ConnectionStrategy.kKeepOpen);
-
-    if (config.streamConfig != null) {
-      server.setConfigJson(gson.toJson(config.streamConfig));
-    }
-
-    return camera;
-  }
-
-  /**
-   * Start running the switched camera.
-   */
-  public static MjpegServer startSwitchedCamera(SwitchedCameraConfig config) {
-    System.out.println("Starting switched camera '" + config.name + "' on " + config.key);
-    MjpegServer server = CameraServer.getInstance().addSwitchedCamera(config.name);
-
-    NetworkTableInstance.getDefault()
-        .getEntry(config.key)
-        .addListener(event -> {
-              if (event.value.isDouble()) {
-                int i = (int) event.value.getDouble();
-                if (i >= 0 && i < cameras.size()) {
-                  server.setSource(cameras.get(i));
-                }
-              } else if (event.value.isString()) {
-                String str = event.value.getString();
-                for (int i = 0; i < cameraConfigs.size(); i++) {
-                  if (str.equals(cameraConfigs.get(i).name)) {
-                    server.setSource(cameras.get(i));
-                    break;
-                  }
-                }
-              }
-            },
-            EntryListenerFlags.kImmediate | EntryListenerFlags.kNew | EntryListenerFlags.kUpdate);
-
-    return server;
   }
 
   /**
    * Main.
    */
   public static void main(String... args) {
-    if (args.length > 0) {
-      configFile = args[0];
+
+    System.out.println("Starting network tables");
+    NetworkTableInstance.getDefault().startClientTeam(5124);
+
+    try {
+      Thread.sleep(5000);
+    } catch (InterruptedException ex) {
+      System.out.println("Program not allowed to wait: network tables may not be started.");
     }
 
-    // read configuration
-    if (!readConfig()) {
-      return;
+    CameraServer server = CameraServer.getInstance();
+    
+    VideoCamera[] cameras = new VideoCamera[NUMBER_CAMERAS + 1];
+    for (int i = 0; i < NUMBER_CAMERAS; i++) {
+      cameras[i] = server.startAutomaticCapture(cameraPorts[i]);
+      cameras[i].setConnectionStrategy(ConnectionStrategy.kAutoManage);
+      cameras[i].setFPS(30);
+      cameras[i].setResolution(320, 240);
+      server.addCamera(cameras[i]);
     }
+    cameras[NUMBER_CAMERAS] = new HttpCamera("limelight", "http://limelight.local:5800");
+    server.addCamera(cameras[NUMBER_CAMERAS]);
+    
+    MjpegServer output = (MjpegServer) server.getServer();
+    output.setSource(cameras[0]);
+    output.setResolution(320, 240);
+    output.setCompression(50);
+    output.setDefaultCompression(50);
+    output.setFPS(30);
 
-    // start NetworkTables
-    NetworkTableInstance ntinst = NetworkTableInstance.getDefault();
-    if (server) {
-      System.out.println("Setting up NetworkTables server");
-      ntinst.startServer();
-    } else {
-      System.out.println("Setting up NetworkTables client for team " + team);
-      ntinst.startClientTeam(team);
-    }
+    NetworkTable table = NetworkTableInstance.getDefault().getTable("rpi");
+    NetworkTableEntry aimbot = table.getEntry("aimbot");
+    aimbot.setDouble(0);
+    NetworkTableEntry camera = table.getEntry("camera");
+    camera.setDouble(0);
+    NetworkTableEntry cameraSelection = NetworkTableInstance.getDefault().getTable("").getEntry("CameraSelection");
+    cameraSelection.setString(cameras[0].getName());
 
-    // start cameras
-    for (CameraConfig config : cameraConfigs) {
-      cameras.add(startCamera(config));
-    }
+    NetworkTableEntry pipeline = NetworkTableInstance.getDefault()
+      .getTable("limelight").getEntry("pipeline");
+    
+    camera.addListener((change) -> {
+      int selected = (int) change.value.getDouble();
+      output.setSource(cameras[selected]);
+      cameraSelection.setString(cameras[selected].getName());
+      if (aimbot.getDouble(0) != 1 && selected == NUMBER_CAMERAS) {
+        pipeline.setDouble(1);
+      }
+      if (aimbot.getDouble(0) == 1 && pipeline.getDouble(0) != 0) {
+        pipeline.setDouble(0);
+      }
+    }, generateAllFlagsMask());
 
-    // start switched cameras
-    for (SwitchedCameraConfig config : switchedCameraConfigs) {
-      startSwitchedCamera(config);
-    }
+    System.out.println("Adding view to Shuffleboard");
+    Shuffleboard.getTab("Driving Display").add("Selected Camera View", output.getSource())
+    .withSize(8, 4).withPosition(1, 0).withWidget(BuiltInWidgets.kCameraStream);
 
-    // loop forever
-    for (;;) {
+    int i = 0;
+    while (true) {
       try {
-        Thread.sleep(10000);
+        SmartDashboard.putNumber("Heartbeat", ++i);
+        Thread.sleep(1000);
       } catch (InterruptedException ex) {
         return;
       }
     }
+  }
+
+  /**
+   * Iterates through the fields in {@link EntryListenerFlags} to find all
+   * public, static, final integers and mask them together. It is assumed that
+   * no other integers will exist in the class than those denoting possible flags,
+   * and that only public, static, and final integers may represent flag masks.
+   * All non-integer fields or fields without the correct modifiers are skipped,
+   * while those found are masked together with a bitwise OR.
+   * 
+   * @return A mask representing all possible entry listener change flags
+   */
+  private static int generateAllFlagsMask() {
+    int mask = 0;
+    for (Field f : EntryListenerFlags.class.getDeclaredFields()) {
+      if (f.getType() == Integer.TYPE) {
+        int mods = f.getModifiers();
+        if ((mods & Modifier.PUBLIC) == 0
+          || (mods & Modifier.STATIC) == 0
+          || (mods & Modifier.FINAL) == 0) {
+            continue;
+        }
+        try {
+          mask |= f.getInt(new EntryListenerFlags(){});
+        } catch (ReflectiveOperationException ex) {
+            // ignore constants that we can't get, because
+            // they must not be intended as flag bit masks
+        }
+      }
+    }
+    return mask;
   }
 }
