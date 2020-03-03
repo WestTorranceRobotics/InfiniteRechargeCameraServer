@@ -48,15 +48,19 @@ public final class Main {
     VideoCamera[] cameras = new VideoCamera[NUMBER_CAMERAS + 1];
     for (int i = 0; i < NUMBER_CAMERAS; i++) {
       cameras[i] = server.startAutomaticCapture(cameraPorts[i]);
-      cameras[i].setConnectionStrategy(ConnectionStrategy.kKeepOpen);
+      cameras[i].setConnectionStrategy(ConnectionStrategy.kAutoManage);
+      cameras[i].setFPS(30);
+      cameras[i].setResolution(720, 480);
+      server.addCamera(cameras[i]);
     }
     cameras[NUMBER_CAMERAS] = new HttpCamera("limelight", "http://limelight.local:5800");
+    server.addCamera(cameras[NUMBER_CAMERAS]);
     
     MjpegServer output = (MjpegServer) server.getServer();
     output.setSource(cameras[0]);
     output.setResolution(720, 480);
     output.setCompression(0);
-    output.setDefaultCompression(0);
+    output.setDefaultCompression(50);
     output.setFPS(30);
 
     NetworkTable table = NetworkTableInstance.getDefault().getTable("rpi");
@@ -64,6 +68,8 @@ public final class Main {
     aimbot.setDouble(0);
     NetworkTableEntry camera = table.getEntry("camera");
     camera.setDouble(0);
+    NetworkTableEntry cameraSelection = NetworkTableInstance.getDefault().getTable("").getEntry("CameraSelection");
+    cameraSelection.setString(cameras[0].getName());
 
     NetworkTableEntry pipeline = NetworkTableInstance.getDefault()
       .getTable("limelight").getEntry("pipeline");
@@ -71,6 +77,7 @@ public final class Main {
     camera.addListener((change) -> {
       int selected = (int) change.value.getDouble();
       output.setSource(cameras[selected]);
+      cameraSelection.setString(cameras[selected].getName());
       if (aimbot.getDouble(0) != 1 && selected == NUMBER_CAMERAS) {
         pipeline.setDouble(1);
       }
