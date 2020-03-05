@@ -1,0 +1,27 @@
+<xml version="1.0">
+<dashboard>
+	<static-widget class="edu.wpi.first.smartdashboard.gui.elements.CameraServerViewer">
+		<location x="0" y="-1"/>
+		<width>1534</width>
+		<height>780</height>
+		<property name="Camera Choice" value=""/>
+	</static-widget>
+	<static-widget class="edu.wpi.first.smartdashboard.gui.elements.CameraServerViewer">
+		<location x="0" y="-1"/>
+		<width>1534</width>
+		<height>780</height>
+		<property name="Camera Choice" value=""/>
+	</static-widget>
+</dashboard>
+<live-window>
+</live-window>
+	<hidden field="limelight_Interface"/>
+	<hidden field="limelight_PipelineName"/>
+	<hidden field="shoot V"/>
+	<hidden field="shoot current"/>
+	<hidden field="ty"/>
+	<hidden field="Heartbeat"/>
+	<hidden field="balls shot"/>
+	<hidden field="Distance to Target"/>
+	<hidden field="limelight_Stream"/>
+</xml>

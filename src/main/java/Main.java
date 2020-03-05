@@ -51,6 +51,7 @@ public final class Main {
       cameras[i].setConnectionStrategy(ConnectionStrategy.kAutoManage);
       cameras[i].setFPS(30);
       cameras[i].setResolution(320, 240);
+      cameras[i].setExposureManual(50);
       server.addCamera(cameras[i]);
     }
     cameras[NUMBER_CAMERAS] = new HttpCamera("limelight", "http://limelight.local:5800");
