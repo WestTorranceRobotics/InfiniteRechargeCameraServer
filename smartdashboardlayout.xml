@@ -1,27 +1,33 @@
 <xml version="1.0">
 <dashboard>
+	<widget field="SHOOOOOT SPEEED" type="Number" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="120"/>
+	</widget>
+	<widget field="limelight_Stream" type="String" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="100"/>
+	</widget>
+	<widget field="Distance to Target" type="Number" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="80"/>
+	</widget>
+	<widget field="Heartbeat" type="Number" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="60"/>
+	</widget>
+	<widget field="encoder Hanger" type="Number" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="40"/>
+	</widget>
+	<widget field="limelight_Interface" type="String" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="20"/>
+	</widget>
+	<widget field="limelight_PipelineName" type="String" class="edu.wpi.first.smartdashboard.gui.elements.TextBox">
+		<location x="0" y="0"/>
+	</widget>
 	<static-widget class="edu.wpi.first.smartdashboard.gui.elements.CameraServerViewer">
-		<location x="0" y="-1"/>
-		<width>1534</width>
-		<height>780</height>
-		<property name="Camera Choice" value=""/>
-	</static-widget>
-	<static-widget class="edu.wpi.first.smartdashboard.gui.elements.CameraServerViewer">
-		<location x="0" y="-1"/>
-		<width>1534</width>
-		<height>780</height>
+		<location x="557" y="214"/>
+		<width>408</width>
+		<height>294</height>
 		<property name="Camera Choice" value=""/>
 	</static-widget>
 </dashboard>
 <live-window>
 </live-window>
-	<hidden field="limelight_Interface"/>
-	<hidden field="limelight_PipelineName"/>
-	<hidden field="shoot V"/>
-	<hidden field="shoot current"/>
-	<hidden field="ty"/>
-	<hidden field="Heartbeat"/>
-	<hidden field="balls shot"/>
-	<hidden field="Distance to Target"/>
-	<hidden field="limelight_Stream"/>
 </xml>

@@ -50,8 +50,8 @@ public final class Main {
       cameras[i] = server.startAutomaticCapture(cameraPorts[i]);
       cameras[i].setConnectionStrategy(ConnectionStrategy.kAutoManage);
       cameras[i].setFPS(30);
-      cameras[i].setResolution(320, 240);
-      cameras[i].setExposureManual(50);
+      cameras[i].setResolution(480, 360);
+      cameras[i].setExposureAuto();
       server.addCamera(cameras[i]);
     }
     cameras[NUMBER_CAMERAS] = new HttpCamera("limelight", "http://limelight.local:5800");
@@ -59,9 +59,9 @@ public final class Main {
     
     MjpegServer output = (MjpegServer) server.getServer();
     output.setSource(cameras[0]);
-    output.setResolution(320, 240);
-    output.setCompression(50);
-    output.setDefaultCompression(50);
+    output.setResolution(480, 360);
+    output.setCompression(20);
+    output.setDefaultCompression(20);
     output.setFPS(30);
 
     NetworkTable table = NetworkTableInstance.getDefault().getTable("rpi");
